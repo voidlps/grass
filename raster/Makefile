@@ -130,7 +130,8 @@ SUBDIRS = \
 	r.water.outlet \
 	r.watershed \
 	r.what \
-	r.what.color
+	r.what.color \
+	r.profile2
 
 PGM = rasterintro
 
