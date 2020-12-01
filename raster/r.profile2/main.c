@@ -19,9 +19,12 @@ struct Colors colors;
 
 static double dist, e, n;
 
-
 int main(int argc, char *argv[])
 {
+    char **ptr;
+    int num_inputs;
+    struct input_info *inputs = NULL;
+
     char *name, *outfile;
     const char *unit;
     int unit_id;
@@ -36,7 +39,6 @@ int main(int argc, char *argv[])
     int havefirst = FALSE;
     int coords = 0, i, k = -1;
     double e1, e2, n1, n2;
-    RASTER_MAP_TYPE data_type;
     struct Cell_head window;
     struct
     {
@@ -155,13 +157,32 @@ int main(int argc, char *argv[])
 
     /* Open Input File for reading */
     /* Get Input Name */
-    name = parm.input->answers[0];
-    G_message(_("name [%s]"), name);
+    for (i = 0; parm.input->answers[i]; i++) ;
+    num_inputs = i;
+    if (num_inputs < 1)
+        G_fatal_error(_("Raster map not found"));
+
+    inputs = G_malloc(num_inputs * sizeof(struct input_info));
+
+    G_message(_("layers [%d]"), num_inputs);
+
     if (parm.g->answer)
 	coords = 1;
 
     /* Open Raster File */
-    fd = Rast_open_old(name, "");
+    for (i = 0; i < num_inputs; i++) {
+	struct input_info *p = &inputs[i];
+
+	p->name = parm.input->answers[i];
+	p->fd = Rast_open_old(p->name, "");
+	if (p->fd < 0)
+		G_fatal_error(_("Unable to open input raster <%s>"), p->name);
+        /* Get Raster Type */
+	p->data_type = Rast_get_map_type(p->fd);
+        Rast_get_cellhd(p->name, "", &p->cellhead);
+        G_message(_("Loading layer [%s], extent N,S,E,W: %.2f,%.2f,%.2f,%.2f"), p->name, p->cellhead.north, p->cellhead.south, p->cellhead.east, p->cellhead.west);
+    }
+
 
     /* initialize color structure */
     if (clr)
@@ -175,10 +196,6 @@ int main(int argc, char *argv[])
     }
     else if (NULL == (fp = fopen(outfile, "w")))
 	G_fatal_error(_("Unable to open file <%s>"), outfile);
-
-    /* Get Raster Type */
-    data_type = Rast_get_map_type(fd);
-    /* Done with file */
 
     /* Show message giving output format */
     G_message(_("Output columns:"));
@@ -209,7 +226,7 @@ int main(int argc, char *argv[])
 		G_fatal_error(_("Invalid coordinates %s %s"), ebuf, nbuf);
 
 	    if (havefirst)
-		do_profile(e1, e2, n1, n2, coords, res, fd, data_type,
+		do_profile(e1, e2, n1, n2, coords, res, num_inputs, inputs, 
 			   fp, null_string, unit, factor);
 	    e1 = e2;
 	    n1 = n2;
@@ -234,7 +251,7 @@ int main(int argc, char *argv[])
 	    n2 = n1;
 
 	    /* Get profile info */
-	    do_profile(e1, e2, n1, n2, coords, res, fd, data_type, fp,
+	    do_profile(e1, e2, n1, n2, coords, res, num_inputs, inputs, fp,
 		       null_string, unit, factor);
 	}
 	else {
@@ -248,7 +265,7 @@ int main(int argc, char *argv[])
 				G_projection());
 
 		/* Get profile info */
-		do_profile(e1, e2, n1, n2, coords, res, fd, data_type,
+		do_profile(e1, e2, n1, n2, coords, res, num_inputs, inputs,
 			   fp, null_string, unit, factor);
 
 	    }
@@ -267,7 +284,7 @@ int main(int argc, char *argv[])
 /* Calculate the Profile Now */
 /* Establish parameters */
 int do_profile(double e1, double e2, double n1, double n2,
-	       int coords, double res, int fd, int data_type, FILE * fp,
+	       int coords, double res, int num_inputs, struct input_info *inputs, FILE * fp,
 	       char *null_string, const char *unit, double factor)
 {
     double rows, cols, LEN;
@@ -287,7 +304,7 @@ int do_profile(double e1, double e2, double n1, double n2,
 	/* Special case for no movement */
 	e = e1;
 	n = n1;
-	read_rast(e, n, dist / factor, fd, coords, data_type, fp, null_string);
+	read_rast2(e, n, dist / factor, num_inputs, inputs, coords, fp, null_string);
     }
 
     k = res / hypot(rows, cols);
@@ -305,7 +322,7 @@ int do_profile(double e1, double e2, double n1, double n2,
     if (rows >= 0 && cols < 0) {
 	/* SE Quad or due east */
 	for (e = e1, n = n1; e < e2 || n > n2; e += X, n -= Y) {
-	    read_rast(e, n, dist / factor, fd, coords, data_type, fp, null_string);
+	    read_rast2(e, n, dist / factor, num_inputs, inputs, coords, fp, null_string);
 	    /* d+=res; */
 	    dist += G_distance(e - X, n + Y, e, n);
 	}
@@ -314,7 +331,7 @@ int do_profile(double e1, double e2, double n1, double n2,
     if (rows < 0 && cols <= 0) {
 	/* NE Quad  or due north */
 	for (e = e1, n = n1; e < e2 || n < n2; e += X, n += Y) {
-	    read_rast(e, n, dist / factor, fd, coords, data_type, fp, null_string);
+	    read_rast2(e, n, dist / factor, num_inputs, inputs, coords, fp, null_string);
 	    /* d+=res; */
 	    dist += G_distance(e - X, n - Y, e, n);
 	}
@@ -323,7 +340,7 @@ int do_profile(double e1, double e2, double n1, double n2,
     if (rows > 0 && cols >= 0) {
 	/* SW Quad or due south */
 	for (e = e1, n = n1; e > e2 || n > n2; e -= X, n -= Y) {
-	    read_rast(e, n, dist / factor, fd, coords, data_type, fp, null_string);
+	    read_rast2(e, n, dist / factor, num_inputs, inputs, coords, fp, null_string);
 	    /* d+=res; */
 	    dist += G_distance(e + X, n + Y, e, n);
 	}
@@ -332,7 +349,7 @@ int do_profile(double e1, double e2, double n1, double n2,
     if (rows <= 0 && cols > 0) {
 	/* NW Quad  or due west */
 	for (e = e1, n = n1; e > e2 || n < n2; e -= X, n += Y) {
-	    read_rast(e, n, dist / factor, fd, coords, data_type, fp, null_string);
+	    read_rast2(e, n, dist / factor, num_inputs, inputs, coords, fp, null_string);
 	    /* d+=res; */
 	    dist += G_distance(e + X, n - Y, e, n);
 	}
@@ -342,4 +359,3 @@ int do_profile(double e1, double e2, double n1, double n2,
      */
     return 0;
 }				/* done with do_profile */
-

@@ -12,6 +12,27 @@
 #include <grass/glocale.h>
 #include "local_proto.h"
 
+int read_rast2(double east, double north, double dist, int num_inputs, struct input_info *inputs, int coords,
+	     FILE * fp, char *null_string)
+{
+    int fd = inputs[0].fd;
+    int data_type = inputs[0].data_type;
+    for (int i=0; i< num_inputs; i++) {
+        if (east >= inputs[i].cellhead.west
+        && east <= inputs[i].cellhead.east
+        && north >= inputs[i].cellhead.south
+        && north <= inputs[i].cellhead.north)
+        {
+            G_message(_("Use layer [%s]; E,N=%.2f,%.2f; extent N,S,E,W: %.2f,%.2f,%.2f,%.2f"), inputs[i].name, east, north, inputs[i].cellhead.north, inputs[i].cellhead.south, inputs[i].cellhead.east, inputs[i].cellhead.west);
+            fd = inputs[i].fd;
+            data_type = inputs[i].data_type;
+            break;
+        }
+    }
+    return read_rast(east, north, dist, fd, coords, data_type, fp, null_string);
+}
+
+
 int read_rast(double east, double north, double dist, int fd, int coords,
 	      RASTER_MAP_TYPE data_type, FILE * fp, char *null_string)
 {
