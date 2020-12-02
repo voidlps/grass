@@ -1,4 +1,4 @@
-#include <stdio.h>
+// /tmp/o2.1 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -20,7 +20,7 @@ int do_profile(double, double, double, double, int, double, int num_inputs, stru
 	       FILE *, char *, const char *, double);
 
 /* read_rast.c */
-int read_rast(double, double, double, int, int, RASTER_MAP_TYPE, FILE *,
+int read_rast(double, double, double, int, int, RASTER_MAP_TYPE, char *,
 	      char *);
 int read_rast2(double, double, double, int num_inputs, struct input_info *, int, FILE *,
 	      char *);
